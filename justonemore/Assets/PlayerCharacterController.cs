@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using KinematicCharacterController;
+using UnityEngine.Events;
 
 public class PlayerCharacterController : BaseCharacterController
 {
@@ -39,7 +40,7 @@ public class PlayerCharacterController : BaseCharacterController
     public float jumpPressedFallGravityMultiplier = 7f;
     public float jumpReleasedFallGravityMultiplier = 20f;
 
-    private List<Collider> ignoreColliders;
+    private List<Collider> ignoreColliders = new List<Collider>();
     public void SetIgnoreColliders(List<Collider> colliders)
     {
         ignoreColliders = colliders;
@@ -68,15 +69,20 @@ public class PlayerCharacterController : BaseCharacterController
     /// </summary>
     override public void UpdateRotation(ref Quaternion currentRotation, float deltaTime)
     {
-        Vector3 euler = playerCamera.transform.rotation.eulerAngles;
-        Quaternion locked = Quaternion.Euler(0, euler.y, 0);
-        currentRotation = locked;
+        currentRotation = desiredRotation;
+    }
+
+    private Quaternion desiredRotation = Quaternion.identity;
+    public void SetDesiredRotation(Quaternion desiredRotation)
+    {
+        this.desiredRotation = desiredRotation;
     }
 
     /// <summary>
     /// Asks what the character's velocity should be on this character update. 
     /// Modify the "currentVelocity" to change the character's velocity.
     /// </summary>
+    public Vector3 CacheVelocity;
     override public void UpdateVelocity(ref Vector3 currentVelocity, float deltaTime)
     {
         
@@ -131,7 +137,7 @@ public class PlayerCharacterController : BaseCharacterController
                 Vector3 jumpDirection = KinematicCharacterMotor.CharacterUp;
                 if (KinematicCharacterMotor.FoundAnyGround && !KinematicCharacterMotor.IsStableOnGround)
                 {
-                    jumpDirection = KinematicCharacterMotor.GroundNormal;
+                    //jumpDirection = KinematicCharacterMotor.GroundNormal;
                 }
 
                 // Makes the character skip ground probing/snapping on its next update. 
@@ -139,18 +145,19 @@ public class PlayerCharacterController : BaseCharacterController
                 KinematicCharacterMotor.ForceUnground();
 
                 // Add to the return velocity and reset jump state
-                currentVelocity += (jumpDirection * JumpSpeed) - Vector3.Project(currentVelocity, KinematicCharacterMotor.CharacterUp);
+                currentVelocity += (jumpDirection * JumpSpeed);// - Vector3.Project(currentVelocity, KinematicCharacterMotor.CharacterUp);
                 _jumpRequested = false;
                 _jumpConsumed = true;
                 _jumpedThisFrame = true;
             }
+
         }
 
         //huge help: https://www.youtube.com/watch?v=7KiK0Aqtmzc
         //fast fall
         if (!KinematicCharacterMotor.IsStableOnGround)
         {
-            if (currentVelocity.y < 0) //if we are falling
+            if (currentVelocity.y < -0.1f) //if we are falling
             {
                 if (jumpPressed)
                 {
@@ -173,21 +180,36 @@ public class PlayerCharacterController : BaseCharacterController
                 }
             }
         }
+
+        CacheVelocity = currentVelocity;
+
     }
 
 
     private bool jumpPressed = false;
+    private bool jumpPressedCache = false;
     public void SetJumpPressed(bool jumpPressed)
     {
+        if (jumpPressedCache != jumpPressed)
+        {
+            jumpPressedCache = jumpPressed;
+            StartCoroutine(jumpCo());
+        }
+
+    }
+
+    IEnumerator jumpCo()
+    {
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForEndOfFrame();
+        bool jumpPressed = jumpPressedCache;
         if (jumpPressed && !this.jumpPressed)
         {
             _timeSinceJumpRequested = 0f;
             _jumpRequested = true;
         }
         this.jumpPressed = jumpPressed;
-
     }
-
 
 
     public void SetDesiredDirection(Vector3 desiredDirection)
@@ -260,7 +282,8 @@ public class PlayerCharacterController : BaseCharacterController
     /// </summary>
     override public bool IsColliderValidForCollisions(Collider coll)
     {
-        if (jumpPressed)
+            //return !ignoreColliders.Contains(coll);
+        if (jumpPressedCache || jumpPressed || !KinematicCharacterMotor.IsStableOnGround || KinematicCharacterMotor.Velocity.y > 0)
         {
             return !ignoreColliders.Contains(coll);
         }
@@ -291,7 +314,16 @@ public class PlayerCharacterController : BaseCharacterController
     /// </summary>
     override public void OnMovementHit(Collider hitCollider, Vector3 hitNormal, Vector3 hitPoint, bool isStableOnHit)
     {
-
+        IPlayerCollideable[] collideables = hitCollider.gameObject.GetComponentsInChildren<IPlayerCollideable>();
+        if (collideables.Length > 0)
+        {
+            Player player = GetComponentInParent<Player>();
+            foreach (var collideable in collideables)
+            {
+                collideable.DidCollide(player);
+            }
+        }
     }
+
 
 }

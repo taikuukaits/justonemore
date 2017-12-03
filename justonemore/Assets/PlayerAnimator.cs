@@ -23,6 +23,18 @@ public class PlayerAnimator : MonoBehaviour {
 
     }
 
+    public void Dance()
+    {
+        animator.SetInteger("Animation_int", 4);
+
+    }
+
+    public void StopDance()
+    {
+        animator.SetInteger("Animation_int", 0);
+
+    }
+
     public void Died()
     {
         animator.SetBool("Death_b", true);

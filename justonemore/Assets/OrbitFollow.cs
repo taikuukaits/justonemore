@@ -60,7 +60,12 @@ public class OrbitFollow : MonoBehaviour
 
     private void Start()
     {
-        targetVerticalAngle = 45f;
+        SetAngle(45f);
+    }
+
+    public void SetAngle(float angle)
+    {
+        targetVerticalAngle = angle;
     }
 
     public void SetFollowTarget(Transform target)

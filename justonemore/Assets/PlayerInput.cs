@@ -5,8 +5,7 @@ using UnityEngine;
 public class PlayerInput : MonoBehaviour {
 
     public PlayerCharacterController playerController;
-    public OrbitFollow orbitFollow;
-
+    public Camera camera;
     /*
          Quaternion left;
     Quaternion right;
@@ -34,19 +33,19 @@ public class PlayerInput : MonoBehaviour {
         float moveHorizontal = Input.GetAxis("Horizontal");
         float moveVertical = Input.GetAxis("Vertical");
 
-        float lookHorizontal = Input.GetAxis("Mouse X");
-        float lookVertical = Input.GetAxis("Mouse Y");
+
 
         float interact = Input.GetAxis("Interact");
         bool jump = Input.GetButton("Jump");
 
-        float orbitDamp = 0.5f;
-        orbitFollow.SetInputs(1, new Vector2(lookHorizontal * orbitDamp, lookVertical * orbitDamp));
-
         playerController.SetJumpPressed(jump);
 
-        Vector3 direction = orbitFollow.transform.forward * moveVertical;
-        direction += orbitFollow.transform.right * moveHorizontal;
+        Vector3 direction = camera.transform.forward * moveVertical;
+        direction += camera.transform.right * moveHorizontal;
         playerController.SetDesiredDirection(direction);
+
+        Vector3 euler = camera.transform.rotation.eulerAngles;
+        Quaternion locked = Quaternion.Euler(0, euler.y, 0);
+        playerController.SetDesiredRotation(locked);
     }
 }
