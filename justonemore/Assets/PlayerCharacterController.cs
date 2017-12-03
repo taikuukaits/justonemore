@@ -39,7 +39,12 @@ public class PlayerCharacterController : BaseCharacterController
     public float jumpPressedFallGravityMultiplier = 7f;
     public float jumpReleasedFallGravityMultiplier = 20f;
 
+    private List<Collider> ignoreColliders;
+    public void SetIgnoreColliders(List<Collider> colliders)
+    {
+        ignoreColliders = colliders;
 
+    }
     public GameObject playerCamera;
 
     /// <summary>
@@ -50,6 +55,11 @@ public class PlayerCharacterController : BaseCharacterController
     override public bool MustUpdateGrounding()
     {
         return true;
+    }
+
+    public bool GetJumpedThisFrame()
+    {
+        return _jumpedThisFrame;
     }
 
     /// <summary>
@@ -250,7 +260,14 @@ public class PlayerCharacterController : BaseCharacterController
     /// </summary>
     override public bool IsColliderValidForCollisions(Collider coll)
     {
-        return true;
+        if (jumpPressed)
+        {
+            return !ignoreColliders.Contains(coll);
+        }
+        else
+        {
+            return true;
+        }
     }
 
     /// <summary>

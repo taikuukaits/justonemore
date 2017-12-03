@@ -58,9 +58,15 @@ public class OrbitFollow : MonoBehaviour
         DefaultVerticalAngle = Mathf.Clamp(DefaultVerticalAngle, MinVerticalAngle, MaxVerticalAngle);
     }
 
-    void Awake()
+    private void Start()
     {
         targetVerticalAngle = 45f;
+    }
+
+    public void SetFollowTarget(Transform target)
+    {
+        FollowTransform = target;
+
         currentDistance = DefaultDistance;
 
         TargetDistance = currentDistance;
@@ -109,6 +115,7 @@ public class OrbitFollow : MonoBehaviour
 
             // Find the smoothed follow position
             currentFollowPosition = Vector3.Lerp(currentFollowPosition, FollowTransform.position, 1f - Mathf.Exp(-FollowingSharpness * deltaTime));
+//            currentFollowPosition = Vector3.Lerp(currentFollowPosition, FollowTransform.position, deltaTime);
 
             // Calculate smoothed rotation
             Quaternion planarRot = Quaternion.LookRotation(PlanarDirection, FollowTransform.up);
