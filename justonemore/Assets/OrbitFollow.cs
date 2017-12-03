@@ -29,14 +29,15 @@ public class OrbitFollow : MonoBehaviour
     public float RotationSharpness = 30f;
 
     [Header("Obstruction")]
+    public bool ObstructionEnabled = false;
     public float ObstructionCheckRadius = 0.5f;
     public LayerMask ObstructionLayers = -1;
     public float ObstructionSharpness = 10000f;
 
     public Vector3 PlanarDirection { get; private set; }
-    public Transform FollowTransform { get; set; }
-    public List<Collider> IgnoredColliders { get; set; }
-    public float TargetDistance { get; set; }
+    public Transform FollowTransform;
+    public List<Collider> IgnoredColliders;
+    public float TargetDistance;
 
     private Vector2 rotationInput;
     private bool distanceIsObstructed;
@@ -118,7 +119,7 @@ public class OrbitFollow : MonoBehaviour
             transform.rotation = targetRotation;
 
             // Handle obstructions
-            {
+            if (ObstructionEnabled) {
                 RaycastHit closestHit = new RaycastHit();
                 closestHit.distance = Mathf.Infinity;
                 obstructionCount = Physics.SphereCastNonAlloc(currentFollowPosition, ObstructionCheckRadius, -transform.forward, obstructions, TargetDistance, ObstructionLayers, QueryTriggerInteraction.Ignore);

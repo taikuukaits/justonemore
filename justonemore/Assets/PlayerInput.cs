@@ -26,23 +26,22 @@ public class PlayerInput : MonoBehaviour {
 	// Update is called once per frame
 	void Update () {
 
-        float horizontal = Input.GetAxis("Horizontal");
-        float vertical = Input.GetAxis("Vertical");
+        float moveHorizontal = Input.GetAxis("Horizontal");
+        float moveVertical = Input.GetAxis("Vertical");
+
+        float lookHorizontal = Input.GetAxis("Mouse X");
+        float lookVertical = Input.GetAxis("Mouse Y");
+
         float interact = Input.GetAxis("Interact");
+        bool jump = Input.GetButton("Jump");
 
-        orbitFollow.SetInputs(1, new Vector2(horizontal, vertical));
+        float orbitDamp = 0.5f;
+        orbitFollow.SetInputs(1, new Vector2(lookHorizontal * orbitDamp, lookVertical * orbitDamp));
 
-        if (vertical > 0)
-        {
-            playerController.SetDirection(PlayerCharacterController.Direction.Forward);
-        }
-        else if (vertical < 0)
-        {
-            playerController.SetDirection(PlayerCharacterController.Direction.Backward);
-        }
-        else
-        {
-            playerController.SetDirection(PlayerCharacterController.Direction.None);
-        }
+        playerController.SetJumpPressed(jump);
+
+        Vector3 direction = orbitFollow.transform.forward * moveVertical;
+        direction += orbitFollow.transform.right * moveHorizontal;
+        playerController.SetDesiredDirection(direction);
     }
 }
