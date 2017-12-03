@@ -60,7 +60,7 @@ public class OrbitFollow : MonoBehaviour
 
     void Awake()
     {
-        targetVerticalAngle = 0f;
+        targetVerticalAngle = 45f;
         currentDistance = DefaultDistance;
 
         TargetDistance = currentDistance;

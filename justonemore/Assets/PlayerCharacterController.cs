@@ -32,8 +32,15 @@ public class PlayerCharacterController : BaseCharacterController
     private float _timeSinceLastAbleToJump = 0f;
     private Vector3 desiredDirection;
 
-    public GameObject playerCamera;
 
+    [Header("Jumping Floatiness")]
+    public float jumpPressedRiseGravityMultiplier = 5f;
+    public float jumpReleasedRiseGravityMultiplier = 10f;
+    public float jumpPressedFallGravityMultiplier = 7f;
+    public float jumpReleasedFallGravityMultiplier = 20f;
+
+
+    public GameObject playerCamera;
 
     /// <summary>
     /// Asks if the character should probe for ground on this character update (return true or false). 
@@ -60,109 +67,9 @@ public class PlayerCharacterController : BaseCharacterController
     /// Asks what the character's velocity should be on this character update. 
     /// Modify the "currentVelocity" to change the character's velocity.
     /// </summary>
-    private bool wantsToMoveCached = false;
-    private float timeSinceWantToMoveChange = 0;
-
-    private float currentJumpRiseTime = 0f;
-    private float currentJumpFallTime = 0f;
-    private Vector3 currentJumpVelocity= new Vector3(0, 0f, 0);
-
-    public float jumpAccelTime = 0.2f;
-    public Vector3 jumpAccel = new Vector3(0, 2f, 0);
-    public Vector3 jumpAntiGravity = new Vector3(0, 3f, 0);
-    private Vector3 jumpVelocity = new Vector3(0, 10f, 0);
-
-    private float minimumJumpRiseTime = 0.4f;
-    private float maximumJumpRiseTime = 0.4f;
-
-    public float pressedRisingAccel = 0;
-    public float releasedRisingAccel = 0;
-    public float pressedFallingVelocity = 3f;
-
-    enum JumpState
-    {
-        Grounded,
-        PressedRising,
-        ReleasedRising, //support minimum required jump height
-        PressedFalling,
-        ReleasedFalling
-    }
-    private JumpState jumpState = JumpState.ReleasedFalling;
-
-    void ProcessJumpTimeAndState(float deltaTime)
-    {
-        if (KinematicCharacterMotor.IsStableOnGround)
-        {
-            jumpState = JumpState.Grounded;
-        }
-
-        if (jumpState == JumpState.Grounded && jumpPressed)
-        {
-            currentJumpRiseTime = 0;
-            currentJumpFallTime = 0;
-            currentJumpVelocity = jumpVelocity;
-            jumpState = JumpState.PressedRising;
-        }
-        else if (jumpState == JumpState.PressedRising && !jumpPressed)
-        {
-            jumpState = JumpState.ReleasedRising;
-        }
-        else if (jumpState == JumpState.PressedFalling && !jumpPressed)
-        {
-            jumpState = JumpState.ReleasedFalling;
-        }
-        else if (jumpState == JumpState.ReleasedFalling)
-        {
-            //nothing
-        }
-
-        if (jumpState == JumpState.PressedRising && currentJumpRiseTime > maximumJumpRiseTime)
-        {
-            jumpState = JumpState.PressedFalling;
-        }
-        else if (jumpState == JumpState.ReleasedRising && currentJumpRiseTime > minimumJumpRiseTime)
-        {
-            jumpState = JumpState.ReleasedFalling;
-        }
-
-        if (jumpState == JumpState.PressedRising || jumpState == JumpState.ReleasedRising)
-        {
-            currentJumpRiseTime += deltaTime;
-        }
-        else if (jumpState == JumpState.PressedFalling || jumpState == JumpState.ReleasedFalling)
-        {
-            currentJumpFallTime += deltaTime;
-        }
-
-    }
-
-    void ProcessJumpVelocity(float deltaTime)
-    {
-        if (jumpState == JumpState.Grounded)
-        {
-            currentJumpVelocity = Vector3.zero;
-        }
-        else if (jumpState == JumpState.PressedRising)
-        {
-            currentJumpVelocity -= pressedFallingVelocity;
-        }
-        else if (jumpState == JumpState.ReleasedRising)
-        {
-            currentJumpVelocity += ReleasedRisingAccelCurve.Evaluate(currentJumpRiseTime) * Vector3.up;
-        }
-        else if (jumpState == JumpState.ReleasedFalling)
-        {
-            currentJumpVelocity = new Vector3(0, pressedFallingVelocity, 0);
-        }
-        else if (jumpState == JumpState.PressedFalling)
-        {
-            currentJumpVelocity = Vector3.zero;
-        }
-    }
-
     override public void UpdateVelocity(ref Vector3 currentVelocity, float deltaTime)
     {
-
+        
         Vector3 targetMovementVelocity = Vector3.zero;
         if (KinematicCharacterMotor.IsStableOnGround)
         {
@@ -174,19 +81,7 @@ public class PlayerCharacterController : BaseCharacterController
             Vector3 reorientedInput = Vector3.Cross(KinematicCharacterMotor.GroundNormal, inputRight).normalized * desiredDirection.magnitude;
             targetMovementVelocity = reorientedInput * MaxStableMoveSpeed;
 
-            bool wantsToMove = desiredDirection.magnitude <= 0.01;
-
-            if (wantsToMove != wantsToMoveCached)
-            {
-                timeSinceWantToMoveChange = 0;
-            }
-            else
-            {
-                //
-
-            }
-
-            currentVelocity = targetMovementVelocity;
+                currentVelocity = targetMovementVelocity;
             // Independant movement Velocity
             if (targetMovementVelocity.magnitude > 0)
             {
@@ -208,38 +103,93 @@ public class PlayerCharacterController : BaseCharacterController
 
             // Gravity
             currentVelocity += Physics.gravity * deltaTime;
+
+            // Drag
+            //currentVelocity *= (1f / (1f + (Drag * deltaTime)));
+
         }
 
-        ProcessJumpTimeAndState(deltaTime);
-        ProcessJumpVelocity(deltaTime);
+        // Handle jumping
+        _jumpedThisFrame = false;
+        _timeSinceJumpRequested += deltaTime;
+        if (_jumpRequested)
+        {
+            // See if we actually are allowed to jump
+            if (!_jumpConsumed && ((AllowJumpingWhenSliding ? KinematicCharacterMotor.FoundAnyGround : KinematicCharacterMotor.IsStableOnGround) || (JumpPostGroundingGraceTime > 0 && _timeSinceLastAbleToJump <= JumpPostGroundingGraceTime)))
+            {
+                // Calculate jump direction before ungrounding
+                Vector3 jumpDirection = KinematicCharacterMotor.CharacterUp;
+                if (KinematicCharacterMotor.FoundAnyGround && !KinematicCharacterMotor.IsStableOnGround)
+                {
+                    jumpDirection = KinematicCharacterMotor.GroundNormal;
+                }
 
-        currentVelocity += jumpVelocity;
+                // Makes the character skip ground probing/snapping on its next update. 
+                // If this line weren't here, the character would remain snapped to the ground when trying to jump. Try commenting this line out and see.
+                KinematicCharacterMotor.ForceUnground();
 
+                // Add to the return velocity and reset jump state
+                currentVelocity += (jumpDirection * JumpSpeed) - Vector3.Project(currentVelocity, KinematicCharacterMotor.CharacterUp);
+                _jumpRequested = false;
+                _jumpConsumed = true;
+                _jumpedThisFrame = true;
+            }
+        }
+
+        //huge help: https://www.youtube.com/watch?v=7KiK0Aqtmzc
+        //fast fall
+        if (!KinematicCharacterMotor.IsStableOnGround)
+        {
+            if (currentVelocity.y < 0) //if we are falling
+            {
+                if (jumpPressed)
+                {
+                    currentVelocity += Physics.gravity * jumpPressedFallGravityMultiplier * deltaTime;
+                }
+                else
+                {
+                    currentVelocity += Physics.gravity * jumpReleasedFallGravityMultiplier * deltaTime;
+                }
+            }
+            else //rising
+            {
+                if (!jumpPressed)
+                {
+                    currentVelocity += Physics.gravity * jumpReleasedRiseGravityMultiplier * deltaTime;
+                }
+                else
+                {
+                    currentVelocity += Physics.gravity * jumpPressedRiseGravityMultiplier * deltaTime;
+                }
+            }
+        }
     }
+
 
     private bool jumpPressed = false;
-    private float jumpPressTime = 0;
-    private bool jumping = false;
-
-
-
-    public void SetJumpPressed(bool value)
+    public void SetJumpPressed(bool jumpPressed)
     {
-        jumpPressed = value;
+        if (jumpPressed && !this.jumpPressed)
+        {
+            _timeSinceJumpRequested = 0f;
+            _jumpRequested = true;
+        }
+        this.jumpPressed = jumpPressed;
+
     }
+
 
 
     public void SetDesiredDirection(Vector3 desiredDirection)
     {
-        this.desiredDirection = desiredDirection.normalized;
+        this.desiredDirection = Vector3.ClampMagnitude(desiredDirection, 1f);
     }
 
     /// <summary>
     /// Gives you a callback for before the character update begins, if you 
     /// want to do anything to start off the update.
     /// </summary>
-    override public void BeforeCharacterUpdate(float deltaTime)
-    {
+    override public void BeforeCharacterUpdate(float deltaTime) {
 
     }
 
