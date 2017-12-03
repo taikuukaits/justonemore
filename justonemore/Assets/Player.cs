@@ -6,6 +6,7 @@ public class Player : MonoBehaviour {
 
     public PlayerAnimator animator;
     public Transform followTarget;
+    public Transform danceTarget;
     public PlayerCharacterController controller;
     
     public PlayerInput input;

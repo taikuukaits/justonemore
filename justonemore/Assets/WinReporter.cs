@@ -7,7 +7,7 @@ public class WinReporter : MonoBehaviour, IPlayerCollideable
 
     public void DidCollide(Player player)
     {
-        controller.DidTouchWin();
+        controller.DidTouchWin(player);
     }
 
     public JustOneMoreController controller;
@@ -17,7 +17,7 @@ public class WinReporter : MonoBehaviour, IPlayerCollideable
         Player player = other.GetComponentInParent<Player>();
         if (player != null)
         {
-            controller.DidTouchWin();
+            controller.DidTouchWin(player);
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using DG.Tweening;
 using UnityEngine;
 
 public class JustOneMoreController : MonoBehaviour {
@@ -13,6 +14,7 @@ public class JustOneMoreController : MonoBehaviour {
     public List<Transform> deactivatedPlayerPositions = new List<Transform>();
     public Dictionary<Transform, Player> playerPositions = new Dictionary<Transform, Player>(); 
     public Dictionary<Player, Transform> positionPlayers = new Dictionary<Player, Transform>(); 
+    public Dictionary<Player, Transform> activePlayerPositions = new Dictionary<Player, Transform>();
 
     private List<Player> deadPlayers = new List<Player>();
 
@@ -33,12 +35,17 @@ public class JustOneMoreController : MonoBehaviour {
     {
         foreach (var deactivatedPlayerPosition in deactivatedPlayerPositions)
         {
-            if (!playerPositions.ContainsKey(deactivatedPlayerPosition) || playerPositions[deactivatedPlayerPosition] == null)
-            {
-                Player newPlayer = NewDeactivedPlayer(deactivatedPlayerPosition.position);
-                playerPositions[deactivatedPlayerPosition] = newPlayer;
-                positionPlayers[newPlayer] = deactivatedPlayerPosition;
-            }
+            ReSpawnDeactivatedPlayerPosition(deactivatedPlayerPosition);
+        }
+    }
+
+    void ReSpawnDeactivatedPlayerPosition(Transform deactivatedPlayerPosition)
+    {
+        if (!playerPositions.ContainsKey(deactivatedPlayerPosition) || playerPositions[deactivatedPlayerPosition] == null)
+        {
+            Player newPlayer = NewDeactivedPlayer(deactivatedPlayerPosition.position);
+            playerPositions[deactivatedPlayerPosition] = newPlayer;
+            positionPlayers[newPlayer] = deactivatedPlayerPosition;
         }
     }
 
@@ -62,6 +69,7 @@ public class JustOneMoreController : MonoBehaviour {
             var deactivatedPlayerPosition = positionPlayers[player];
             positionPlayers.Remove(player);
             playerPositions.Remove(deactivatedPlayerPosition);
+            activePlayerPositions[player] = deactivatedPlayerPosition;
         }
 
         var become = player.GetComponent<BecomePlayerOnContact>();
@@ -112,11 +120,11 @@ public class JustOneMoreController : MonoBehaviour {
     }
 
 
-    public void DidTouchWin()
+    public void DidTouchWin(Player player)
     {
         //if (currentPlayers.Count > 2)
         //{
-            StartCoroutine(LevelWon());
+            StartCoroutine(LevelWon(player));
         //}
     }
 
@@ -141,6 +149,13 @@ public class JustOneMoreController : MonoBehaviour {
             if (deadPlayer.transform.position.y < -50)
             {
                 completelyDeadPlayers.Add(deadPlayer);
+            }
+
+            if (activePlayerPositions.ContainsKey(deadPlayer))
+            {
+                Transform deadPlayerTransform = activePlayerPositions[deadPlayer];
+                activePlayerPositions.Remove(deadPlayer);
+                ReSpawnDeactivatedPlayerPosition(deadPlayerTransform);
             }
 
         }
@@ -205,102 +220,133 @@ public class JustOneMoreController : MonoBehaviour {
 
     }
 
-    public IEnumerator LevelWon()
+    public static float AngleSigned(Vector3 v1, Vector3 v2, Vector3 n)
+    {
+        return Mathf.Atan2(
+            Vector3.Dot(n, Vector3.Cross(v1, v2)),
+            Vector3.Dot(v1, v2)) * Mathf.Rad2Deg;
+    }
+
+
+    public float AngleOnXZ(Vector3 p1, Vector3 p2)
+    {
+        return Mathf.Atan2(p2.z - p1.z, p2.x - p1.x) * 180 / Mathf.PI;
+    }
+
+    public IEnumerator LevelWon(Player byPlayer)
     {
         foreach (var currentPlayer in currentPlayers)
         {
             currentPlayer.SetInputEnabled(false);
-            currentPlayer.Dance();
+            //currentPlayer.Dance();
         }
 
         orbitInput.enabled = false;
         orbitFollow.enabled = false;
         orbitFollow.SetAngle(0);
         
-        float circumferenceSpeed = 5f;
-        
-        //ugh this is fucked!
-        Transform followTarget = orbitFollow.FollowTransform;
-        Transform targetTransform = currentPlayers.First().transform;
+        float circumferenceSpeed = 15f;
+
+        Vector3 oldTarget = orbitFollow.FollowTransform.position;
+        Transform targetTransform = byPlayer.danceTarget;
         Vector3 target = targetTransform.position;
-        Vector3 cameraStartPosition = mainCamera.transform.position;
         Vector3 forward = targetTransform.forward;
-        forward.y = 0;
-        Vector3 cameraTargetPosition = target + forward.normalized * 5f + Vector3.up * 3f;
 
-        Vector3 midpoint = cameraStartPosition + ((cameraTargetPosition - cameraStartPosition) / 2f);
+        Vector3 cameraStartPosition = mainCamera.transform.position;
+        Vector3 cameraEndPosition = target + forward.normalized * 5f + Vector3.up * 0.25f;
+        { //get into cameraEndPosition, looking at the Dance Target
+            Vector3 midpoint = cameraStartPosition + ((cameraEndPosition - cameraStartPosition) / 2f);
 
-        float radiusMid = Vector3.Distance(new Vector3(midpoint.x, 0, midpoint.z), new Vector3(cameraStartPosition.x, 0, cameraStartPosition.z));
-        float circumferenceMid = Mathf.PI * 2f * radiusMid;
-        float timeToGoRoundMid = circumferenceMid / circumferenceSpeed;
-        float degreesPerSecondMid = 360f / timeToGoRoundMid;
-        float diameterSwirl = Vector3.Distance(new Vector3(target.x, 0, target.z), new Vector3(mainCamera.transform.position.x, 0, mainCamera.transform.position.z));
-        float circumferenceSwirl = Mathf.PI * diameterSwirl;
-        float timeToGoRoundSwirl = circumferenceSwirl / circumferenceSpeed;
-        float degreesPerSecondSwirl = 360f / timeToGoRoundSwirl;
-        //gotta go 180 degrees
-        float totalStartTime = 180f / degreesPerSecondMid;
-        float startTime = 0;
-        float speed = 1f;
-        while (startTime < totalStartTime)
-        {
-            startTime += Time.deltaTime;
-            mainCamera.transform.RotateAround(midpoint, Vector3.up, degreesPerSecondSwirl * Time.deltaTime);
+            float startAngle = AngleOnXZ(midpoint, cameraStartPosition);
+            float endAngle = AngleOnXZ(midpoint, cameraEndPosition);
 
-            Vector3 cam = mainCamera.transform.position;
-            cam.y = Mathf.Lerp(cameraStartPosition.y, cameraTargetPosition.y, startTime / totalStartTime);
-            mainCamera.transform.position = cam;
+            float angleToMove = startAngle - endAngle;
 
-            Vector3 direction = transform.position - target;
-            Quaternion toRotation = Quaternion.FromToRotation(transform.forward, direction);
-            transform.rotation = Quaternion.Lerp(transform.rotation, toRotation, speed * Time.time);
+            float radius = Vector3.Distance(new Vector3(midpoint.x, 0, midpoint.z), new Vector3(cameraStartPosition.x, 0, cameraStartPosition.z));
+            float circumference = Mathf.PI * 2f * radius;
 
-            yield return new WaitForEndOfFrame();
-        }
-
-
-        float cameraMoveTime = 2f;
-        float currentCameraMoveTime = 0f;
-
-        //while (currentCameraMoveTime < cameraMoveTime)
-        // {
-        //m//ainCamera.transform.RotateAround(target, Vector3.up, degreesPerSecond * Time.deltaTime);
-        //yield return new WaitForEndOfFrame();
-        //}
-
-
-
-        float cooldownTime = 2f;
-        float coolDownPerSecond = degreesPerSecondSwirl / cooldownTime;
-        float time = 0f;
-        float totalTime = 12f;
-
-        
-        while (time < totalTime)
-        {
-            mainCamera.transform.RotateAround(target, Vector3.up, degreesPerSecondSwirl * Time.deltaTime);
-            //mainCamera.transform.position -= mainCamera.transform.forward * Time.deltaTime * 1f;
-
-            if (time > totalTime - cooldownTime)
+            float distanceToMove = circumference * (Mathf.Abs(angleToMove) / 360f);
+            float timeToMove = distanceToMove / circumferenceSpeed;
+            Quaternion startRotation = mainCamera.transform.rotation;
+            float currentTime = 0f;
+            float lastDegree = 0f;
+            while (currentTime < timeToMove)
             {
-                degreesPerSecondSwirl -= coolDownPerSecond * Time.deltaTime;
+                currentTime += Time.deltaTime;
+                float nextDegree = DOVirtual.EasedValue(0f, angleToMove, currentTime / timeToMove, Ease.OutCubic);
+                mainCamera.transform.RotateAround(midpoint, Vector3.up, nextDegree - lastDegree);
+                lastDegree = nextDegree;
+
+                float clamp = Mathf.Clamp(currentTime, 0f, timeToMove - 0.25f);
+
+                Vector3 cam = mainCamera.transform.position;
+                cam.y = DOVirtual.EasedValue(cameraStartPosition.y, cameraEndPosition.y, clamp / (timeToMove - 0.2f), Ease.InOutCubic); //subtract a bit so it finishes early?
+                mainCamera.transform.position = cam;
+
+                mainCamera.transform.LookAt(target + ((oldTarget - target) * (1- DOVirtual.EasedValue(0, 1f, clamp / (timeToMove - 0.25f), Ease.OutCubic))));
+
+                yield return new WaitForEndOfFrame();
             }
-            time += Time.deltaTime;
-            yield return new WaitForEndOfFrame();
+
+            Debug.Log(angleToMove / timeToMove);
         }
 
-        yield return new WaitForSeconds(5f);
-
-
-        orbitFollow.SetInputs(1, new Vector2(0, 0));
-        orbitInput.enabled = true;
-        orbitFollow.enabled = true;
-        orbitFollow.SetAngle(45f);
+        yield return new WaitForSeconds(0.1f);
 
         foreach (var currentPlayer in currentPlayers)
         {
-            currentPlayer.StopDance();
-            currentPlayer.SetInputEnabled(true);
+            currentPlayer.Dance();
+            yield return new WaitForSeconds(0.25f);
+        }
+
+        {//spin around the guy
+            //translate circumferenceSpeed into degreesPerSecond
+            float radius = Vector3.Distance(new Vector3(target.x, 0, target.z), new Vector3(mainCamera.transform.position.x, 0, mainCamera.transform.position.z));
+            float circumference = Mathf.PI * 2f * radius;
+            float timeToTravelCircumference = circumference / 10f;
+
+            float totalDegrees = 360f * 2f; //two revolutions
+            float timeToTravelDegree = timeToTravelCircumference / 360f; //time per degree
+            float totalTime = timeToTravelDegree * totalDegrees; //degree * time per degree
+
+            float currentTime = 0f;
+            float lastDegree = 0f;
+            while (currentTime < totalTime)
+            {
+                currentTime += Time.deltaTime;
+
+                float nextDegree = DOVirtual.EasedValue(0f, totalDegrees, currentTime / totalTime, Ease.InOutQuad);
+                float degreeDelta = nextDegree - lastDegree;
+                lastDegree = nextDegree;
+
+                mainCamera.transform.RotateAround(target, Vector3.up, degreeDelta);
+
+                if (currentTime / totalTime > 0.25f)
+                {
+                    mainCamera.transform.position -= mainCamera.transform.forward * Time.deltaTime * 2f;
+                    mainCamera.transform.LookAt(target);
+                }
+
+                yield return new WaitForEndOfFrame();
+            }
+
+ 
+
+        }
+
+        if (false)
+        {
+
+            orbitFollow.SetInputs(1, new Vector2(0, 0));
+            orbitInput.enabled = true;
+            orbitFollow.enabled = true;
+            orbitFollow.SetAngle(45f);
+
+            foreach (var currentPlayer in currentPlayers)
+            {
+                currentPlayer.StopDance();
+                currentPlayer.SetInputEnabled(true);
+            }
         }
     }
 }
