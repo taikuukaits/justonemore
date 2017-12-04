@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 
 public class Player : MonoBehaviour {
@@ -8,7 +9,9 @@ public class Player : MonoBehaviour {
     public Transform followTarget;
     public Transform danceTarget;
     public PlayerCharacterController controller;
-    
+    public GameObject model;
+    public DOTweenAnimation scaleAnimation;
+
     public PlayerInput input;
 
     public Vector3 velocity;
@@ -26,6 +29,12 @@ public class Player : MonoBehaviour {
         basevelocity = controller.KinematicCharacterMotor.BaseVelocity;	
         cachevelocity = controller.CacheVelocity;	
 	}
+
+    public void Scale()
+    {
+        model.transform.localScale = Vector3.zero;
+        scaleAnimation.enabled = true;
+    }
 
     public void Died()
     {
