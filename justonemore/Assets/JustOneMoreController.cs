@@ -10,73 +10,81 @@ public class JustOneMoreController : MonoBehaviour {
     public Camera mainCamera;
     public OrbitInput orbitInput;
     public OrbitFollow orbitFollow;
+    public CameraMoveToLocation cameraMove;
     public GameObject playerPrefab;
 
-    private List<Transform> deactivatedPlayerPositions = new List<Transform>();
-    private Dictionary<Transform, Player> playerPositions = new Dictionary<Transform, Player>();
-    private Dictionary<Player, Transform> positionPlayers = new Dictionary<Player, Transform>();
-    private Dictionary<Player, Transform> activePlayerPositions = new Dictionary<Player, Transform>();
+    private List<Transform> playerPositions = new List<Transform>();
+    private Dictionary<Transform, Player> playerToPositions = new Dictionary<Transform, Player>();
+    private Dictionary<Player, Transform> positionToPlayers = new Dictionary<Player, Transform>();
+    private Dictionary<Player, Transform> activePlayerToPositions = new Dictionary<Player, Transform>();
 
+    private Player leader;
     private List<Player> deadPlayers = new List<Player>();
-
     private List<Player> currentPlayers = new List<Player>();
     private List<Collider> playerColliders = new List<Collider>();
-    
-    public void RegisterDeactivatedPlayerTransform(Transform newTransform)
+
+    public PlayerSpawn FirstPlayerSpawn;
+    private Transform RespawnPlayerTransform;
+
+    public int GetPlayerCount()
     {
-        deactivatedPlayerPositions.Add(newTransform);
-        ReSpawnDeactivatedPlayerPosition(newTransform);
+        return currentPlayers.Count;
     }
+
+    public void RegisterPlayerSpawn(Transform newTransform)
+    {
+        playerPositions.Add(newTransform);
+        Player player = RespawnPlayerPosition(newTransform);
+   }
 
     // Use this for initialization
     void Start () {
         playerPrefab.SetActive(false);
 
-        SpawnPlayers();
-        ReSpawnDeactivatedPlayers();
+        FirstPlayerSpawn.BecomeAvailable();
 
+        Player firstPlayer = playerToPositions[FirstPlayerSpawn.transform];
+
+        ActivatePlayer(firstPlayer);
+
+        RespawnPlayerTransform = FirstPlayerSpawn.transform;
         //StartCoroutine(LevelWon());
     }
 
-    void ReSpawnDeactivatedPlayers()
+    void RespawnPlayers()
     {
-        foreach (var deactivatedPlayerPosition in deactivatedPlayerPositions)
+        foreach (var playerSpawnPosition in playerPositions)
         {
-            ReSpawnDeactivatedPlayerPosition(deactivatedPlayerPosition);
+            Player player = RespawnPlayerPosition(playerSpawnPosition);
+            if (playerSpawnPosition == RespawnPlayerTransform)
+            {
+                ActivatePlayer(player);
+                //ChangeTarget();
+            }
         }
     }
-
-    void ReSpawnDeactivatedPlayerPosition(Transform deactivatedPlayerPosition)
+    
+    Player RespawnPlayerPosition(Transform playerSpawnPosition)
     {
-        if (!playerPositions.ContainsKey(deactivatedPlayerPosition) || playerPositions[deactivatedPlayerPosition] == null)
+        if (!playerToPositions.ContainsKey(playerSpawnPosition) || playerToPositions[playerSpawnPosition] == null)
         {
-            Player newPlayer = NewDeactivedPlayer(deactivatedPlayerPosition.position);
-            playerPositions[deactivatedPlayerPosition] = newPlayer;
-            positionPlayers[newPlayer] = deactivatedPlayerPosition;
+            Player newPlayer = NewPlayer(playerSpawnPosition.position);
+            playerToPositions[playerSpawnPosition] = newPlayer;
+            positionToPlayers[newPlayer] = playerSpawnPosition;
+            return newPlayer;
         }
-    }
 
-    void SpawnPlayers ()
-    {
-        NewActivePlayer(playerPrefab.transform.position);
-        //NewPlayer(playerPrefab.transform.position + Vector3.left);
-        //NewPlayer(playerPrefab.transform.position + Vector3.left * 2);
-        //NewPlayer(playerPrefab.transform.position - Vector3.left);
-        //NewPlayer(playerPrefab.transform.position - Vector3.left * 2);
-        //NewPlayer(playerPrefab.transform.position + Vector3.forward);
-        //NewPlayer(playerPrefab.transform.position + Vector3.forward * 2);
-        //NewPlayer(playerPrefab.transform.position - Vector3.forward);
-        //NewPlayer(playerPrefab.transform.position - Vector3.forward * 2);
+        return playerToPositions[playerSpawnPosition];
     }
 
     public void ActivatePlayer(Player player)
     {
-        if (positionPlayers.ContainsKey(player))
+        if (positionToPlayers.ContainsKey(player))
         {
-            var deactivatedPlayerPosition = positionPlayers[player];
-            positionPlayers.Remove(player);
-            playerPositions.Remove(deactivatedPlayerPosition);
-            activePlayerPositions[player] = deactivatedPlayerPosition;
+            var playerSpawnPosition = positionToPlayers[player];
+            positionToPlayers.Remove(player);
+            playerToPositions.Remove(playerSpawnPosition);
+            activePlayerToPositions[player] = playerSpawnPosition;
         }
 
         var become = player.GetComponent<BecomePlayerOnContact>();
@@ -87,7 +95,6 @@ public class JustOneMoreController : MonoBehaviour {
         Collider[] colliders = player.GetComponentsInChildren<Collider>();
         playerColliders.AddRange(colliders);
         currentPlayers.Add(player);
-        orbitFollow.SetFollowTarget(player.followTarget);
 
         player.GetComponentInChildren<PlayerInput>().enabled = true;
 
@@ -95,9 +102,12 @@ public class JustOneMoreController : MonoBehaviour {
         {
             currentPlayer.SetIgnoreColliders(playerColliders);
         }
+
+        leader = player;
+        orbitFollow.SetFollowTarget(leader.followTarget);
     }
 
-    Player NewPlayer(Vector3 position)
+    Player InstantiatePlayer(Vector3 position)
     {
         GameObject newPlayerGO = Instantiate(playerPrefab, position, playerPrefab.transform.rotation);
         newPlayerGO.SetActive(true);
@@ -109,15 +119,15 @@ public class JustOneMoreController : MonoBehaviour {
 
     Player NewActivePlayer(Vector3 position)
     {
-        Player player = NewPlayer(position);
+        Player player = InstantiatePlayer(position);
         player.SetInputEnabled(true);
         ActivatePlayer(player);
         return player;
     }
 
-    Player NewDeactivedPlayer(Vector3 position)
+    Player NewPlayer(Vector3 position)
     {
-        Player player = NewPlayer(position);
+        Player player = InstantiatePlayer(position);
         player.SetInputEnabled(false);
         player.Scale();
 
@@ -159,11 +169,11 @@ public class JustOneMoreController : MonoBehaviour {
                 completelyDeadPlayers.Add(deadPlayer);
             }
 
-            if (activePlayerPositions.ContainsKey(deadPlayer))
+            if (activePlayerToPositions.ContainsKey(deadPlayer))
             {
-                Transform deadPlayerTransform = activePlayerPositions[deadPlayer];
-                activePlayerPositions.Remove(deadPlayer);
-                ReSpawnDeactivatedPlayerPosition(deadPlayerTransform);
+                Transform deadPlayerTransform = activePlayerToPositions[deadPlayer];
+                activePlayerToPositions.Remove(deadPlayer);
+                RespawnPlayerPosition(deadPlayerTransform);
             }
 
         }
@@ -176,12 +186,15 @@ public class JustOneMoreController : MonoBehaviour {
 
         if (currentPlayers.Count == 0)
         {
-            SpawnPlayers();
-            ReSpawnDeactivatedPlayers();
+            RespawnPlayers();
         }
         else
         {
-            orbitFollow.SetFollowTarget(currentPlayers.First().followTarget);
+            if (!currentPlayers.Contains(leader))
+            {
+                leader = currentPlayers.First();
+                orbitFollow.SetFollowTarget(leader.followTarget);
+            }
         }
 
         if (Input.GetMouseButtonDown(1))
@@ -230,5 +243,25 @@ public class JustOneMoreController : MonoBehaviour {
 
 
 
-    
+    bool changingTarget = false;
+    IEnumerator ChangeTarget()
+    {
+        if (!changingTarget)
+        {
+            changingTarget = true;
+
+            orbitFollow.enabled = false;
+            Vector3 offset = orbitFollow.GetCurrentOffset();
+            Transform newTargetTransform = leader.followTarget;
+            Vector3 newPosition = newTargetTransform.position;
+
+            Vector3 newTarget = newPosition + offset;
+
+            yield return StartCoroutine(cameraMove.MoveToPositionCo(newTarget));
+
+            orbitFollow.enabled = true;
+            orbitFollow.SetFollowTarget(newTargetTransform);
+            changingTarget = false;
+        }
+    }
 }

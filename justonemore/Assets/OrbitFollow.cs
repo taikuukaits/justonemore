@@ -97,6 +97,11 @@ public class OrbitFollow : MonoBehaviour
         this.zoomInput = zoomInput;
     }
 
+    public Vector3 GetCurrentOffset()
+    {
+        return currentFollowPosition - FollowTransform.position;
+    }
+
     private void LateUpdate()
     {
         float deltaTime = Time.deltaTime;

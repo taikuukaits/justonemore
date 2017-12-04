@@ -4,12 +4,18 @@ using UnityEngine;
 
 public class TileGroupSpawner : PlayerTriggerable {
 
+    public int requiredPlayers = 1;
 
     public override void OnPlayerTrigger(Player player)
     {
-        GetComponentInParent<TileGroup>().Spawn();
 
-        Destroy(this.gameObject);
+        JustOneMoreController controller = FindObjectOfType<JustOneMoreController>();
+        if (controller.GetPlayerCount() >= requiredPlayers)
+        {
+            GetComponentInParent<TileGroup>().Spawn();
+
+            Destroy(this.gameObject);
+        }
 
     }
 
