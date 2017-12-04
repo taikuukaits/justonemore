@@ -19,6 +19,6 @@ public class BecomePlayerOnContact : MonoBehaviour, IPlayerCollideable
 
     public void DidCollide(Player player)
     {
-        controller.ActivatePlayer(playerToActivate);
+        controller.JoinPlayer(playerToActivate);
     }
 }

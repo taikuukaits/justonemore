@@ -4,6 +4,11 @@ using UnityEngine;
 
 public class PlayerSpawn : MonoBehaviour, IOnTileGroupSpawned
 {
+    public Player.PlayerType playerType;
+
+    [System.NonSerialized]
+    public Player lastSpawnedPlayer;
+
     void Start()
     {
         this.gameObject.SetActive(false);
@@ -16,8 +21,8 @@ public class PlayerSpawn : MonoBehaviour, IOnTileGroupSpawned
 
     public void BecomeAvailable()
     {
-        if (this.gameObject.active) return;
-        FindObjectOfType<JustOneMoreController>().RegisterPlayerSpawn(this.transform);
+        if (this.gameObject.activeSelf) return;
+        FindObjectOfType<JustOneMoreController>().RegisterPlayerSpawn(this);
         this.gameObject.SetActive(true);
     }
 }

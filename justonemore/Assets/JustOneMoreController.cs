@@ -13,28 +13,27 @@ public class JustOneMoreController : MonoBehaviour {
     public CameraMoveToLocation cameraMove;
     public GameObject playerPrefab;
 
-    private List<Transform> playerPositions = new List<Transform>();
-    private Dictionary<Transform, Player> playerToPositions = new Dictionary<Transform, Player>();
-    private Dictionary<Player, Transform> positionToPlayers = new Dictionary<Player, Transform>();
-    private Dictionary<Player, Transform> activePlayerToPositions = new Dictionary<Player, Transform>();
+    private List<PlayerSpawn> playerSpawns = new List<PlayerSpawn>();
 
     private Player leader;
-    private List<Player> deadPlayers = new List<Player>();
+    private List<Player> currentTeam = new List<Player>();
+
     private List<Player> currentPlayers = new List<Player>();
+    private List<Player> deadPlayers = new List<Player>();
     private List<Collider> playerColliders = new List<Collider>();
 
     public PlayerSpawn FirstPlayerSpawn;
-    private Transform RespawnPlayerTransform;
+    private PlayerSpawn LeaderPlayerSpawn;
 
-    public int GetPlayerCount()
+    public int GetTeamCount()
     {
-        return currentPlayers.Count;
+        return currentTeam.Count;
     }
 
-    public void RegisterPlayerSpawn(Transform newTransform)
+    public void RegisterPlayerSpawn(PlayerSpawn newSpawn)
     {
-        playerPositions.Add(newTransform);
-        Player player = RespawnPlayerPosition(newTransform);
+        playerSpawns.Add(newSpawn);
+        Player player = RespawnPlayerSpawn(newSpawn);
    }
 
     // Use this for initialization
@@ -43,49 +42,45 @@ public class JustOneMoreController : MonoBehaviour {
 
         FirstPlayerSpawn.BecomeAvailable();
 
-        Player firstPlayer = playerToPositions[FirstPlayerSpawn.transform];
+        Player firstPlayer = FirstPlayerSpawn.lastSpawnedPlayer;
 
-        ActivatePlayer(firstPlayer);
+        JoinPlayer(firstPlayer);
 
-        RespawnPlayerTransform = FirstPlayerSpawn.transform;
+        LeaderPlayerSpawn = FirstPlayerSpawn;
         //StartCoroutine(LevelWon());
     }
 
     void RespawnPlayers()
     {
-        foreach (var playerSpawnPosition in playerPositions)
+        foreach (var playerSpawn in playerSpawns)
         {
-            Player player = RespawnPlayerPosition(playerSpawnPosition);
-            if (playerSpawnPosition == RespawnPlayerTransform)
+            Player player = RespawnPlayerSpawn(playerSpawn);
+            if (playerSpawn == LeaderPlayerSpawn)
             {
-                ActivatePlayer(player);
+                JoinPlayer(player);
                 //ChangeTarget();
             }
         }
     }
     
-    Player RespawnPlayerPosition(Transform playerSpawnPosition)
+    Player RespawnPlayerSpawn(PlayerSpawn playerSpawn)
     {
-        if (!playerToPositions.ContainsKey(playerSpawnPosition) || playerToPositions[playerSpawnPosition] == null)
+        if (playerSpawn.lastSpawnedPlayer == null)
         {
-            Player newPlayer = NewPlayer(playerSpawnPosition.position);
-            playerToPositions[playerSpawnPosition] = newPlayer;
-            positionToPlayers[newPlayer] = playerSpawnPosition;
+            Player newPlayer = NewPlayer(playerSpawn.transform.position);
+            newPlayer.playerSpawnBirthplace = playerSpawn;
+            playerSpawn.lastSpawnedPlayer = newPlayer;
+            newPlayer.SetPlayerType(playerSpawn.playerType);
+            currentPlayers.Add(newPlayer);
             return newPlayer;
         }
 
-        return playerToPositions[playerSpawnPosition];
+        return playerSpawn.lastSpawnedPlayer;
     }
 
-    public void ActivatePlayer(Player player)
+    public void JoinPlayer(Player player)
     {
-        if (positionToPlayers.ContainsKey(player))
-        {
-            var playerSpawnPosition = positionToPlayers[player];
-            positionToPlayers.Remove(player);
-            playerToPositions.Remove(playerSpawnPosition);
-            activePlayerToPositions[player] = playerSpawnPosition;
-        }
+        if (currentTeam.Contains(player)) return;
 
         var become = player.GetComponent<BecomePlayerOnContact>();
         if (become != null) {
@@ -94,7 +89,7 @@ public class JustOneMoreController : MonoBehaviour {
 
         Collider[] colliders = player.GetComponentsInChildren<Collider>();
         playerColliders.AddRange(colliders);
-        currentPlayers.Add(player);
+        currentTeam.Add(player);
 
         player.GetComponentInChildren<PlayerInput>().enabled = true;
 
@@ -103,21 +98,28 @@ public class JustOneMoreController : MonoBehaviour {
             currentPlayer.SetIgnoreColliders(playerColliders);
         }
 
-        if (leader != null) leader.DiscardLeader();
-        leader = player;
-        orbitFollow.SetFollowTarget(leader.followTarget);
-        leader.BecomeLeader();
+        player.JoinTeam();
+
+        if (leader == null)
+        {
+            leader = player;
+            LeaderPlayerSpawn = leader.playerSpawnBirthplace;
+            orbitFollow.SetFollowTarget(leader.followTarget);
+            leader.BecomeLeader();
+        }
     }
 
     public void ToggleLeader()
     {
         if (leader != null) leader.DiscardLeader();
 
-        int leaderPos = currentPlayers.IndexOf(leader);
+        int leaderPos = currentTeam.IndexOf(leader);
+        if (leaderPos == -1) Debug.Log("WHAT");
         leaderPos++;
-        if (leaderPos >= currentPlayers.Count) leaderPos = 0;
+        if (leaderPos >= currentTeam.Count) leaderPos = 0;
         
-        leader = currentPlayers[leaderPos];
+        leader = currentTeam[leaderPos];
+        LeaderPlayerSpawn = leader.playerSpawnBirthplace;
         orbitFollow.SetFollowTarget(leader.followTarget);
         leader.BecomeLeader();
     }
@@ -130,14 +132,6 @@ public class JustOneMoreController : MonoBehaviour {
         Player player = newPlayerGO.GetComponent<Player>();
         return player;
         
-    }
-
-    Player NewActivePlayer(Vector3 position)
-    {
-        Player player = InstantiatePlayer(position);
-        player.SetInputEnabled(true);
-        ActivatePlayer(player);
-        return player;
     }
 
     Player NewPlayer(Vector3 position)
@@ -158,13 +152,13 @@ public class JustOneMoreController : MonoBehaviour {
     {
         //if (currentPlayers.Count > 2)
         //{
-        danceController.Dance(currentPlayers, player, orbitInput, orbitFollow, mainCamera);
+        danceController.Dance(currentTeam, player, orbitInput, orbitFollow, mainCamera);
         //}
     }
 
     public void Disband()
     {
-        foreach (Player player in currentPlayers)
+        foreach (Player player in currentTeam)
         {
             if (leader != player)
             {
@@ -172,8 +166,12 @@ public class JustOneMoreController : MonoBehaviour {
                 var becomePlayerOnContact = player.gameObject.AddComponent<BecomePlayerOnContact>();
                 becomePlayerOnContact.playerToActivate = player;
                 becomePlayerOnContact.controller = this;
+                player.DisbandTeam();
             }
         }
+
+        currentTeam.Clear();
+        currentTeam.Add(leader);
     }
 
     // Update is called once per frame
@@ -193,10 +191,20 @@ public class JustOneMoreController : MonoBehaviour {
             if (currentPlayer.transform.position.y < -10)
             {
                 newlyDeadPlayers.Add(currentPlayer);
+
                 
             }
         }
 
+        foreach (var deadPlayer in newlyDeadPlayers)
+        {
+            PlayerSpawn playerSpawn = deadPlayer.playerSpawnBirthplace;
+            playerSpawn.lastSpawnedPlayer = null;
+            deadPlayer.playerSpawnBirthplace = null;
+            RespawnPlayerSpawn(playerSpawn);
+        }
+
+        currentTeam.RemoveAll(player => newlyDeadPlayers.Contains(player));
         currentPlayers.RemoveAll(player => newlyDeadPlayers.Contains(player));
         deadPlayers.AddRange(newlyDeadPlayers);
 
@@ -207,14 +215,7 @@ public class JustOneMoreController : MonoBehaviour {
             {
                 completelyDeadPlayers.Add(deadPlayer);
             }
-
-            if (activePlayerToPositions.ContainsKey(deadPlayer))
-            {
-                Transform deadPlayerTransform = activePlayerToPositions[deadPlayer];
-                activePlayerToPositions.Remove(deadPlayer);
-                RespawnPlayerPosition(deadPlayerTransform);
-            }
-
+            
         }
 
         deadPlayers.RemoveAll(player => completelyDeadPlayers.Contains(player));
@@ -223,16 +224,17 @@ public class JustOneMoreController : MonoBehaviour {
             Destroy(deadPlayer.gameObject);
         }
 
-        if (currentPlayers.Count == 0)
+        if (currentTeam.Count == 0)
         {
             RespawnPlayers();
         }
         else
         {
-            if (!currentPlayers.Contains(leader))
+            if (!currentTeam.Contains(leader))
             {
                 if (leader != null) leader.DiscardLeader();
-                leader = currentPlayers.First();
+                leader = currentTeam.First();
+                LeaderPlayerSpawn = leader.playerSpawnBirthplace;
                 leader.BecomeLeader();
                 orbitFollow.SetFollowTarget(leader.followTarget);
             }
@@ -240,7 +242,7 @@ public class JustOneMoreController : MonoBehaviour {
 
         if (Input.GetMouseButtonDown(1))
         {
-            foreach (var currentPlayer in currentPlayers)
+            foreach (var currentPlayer in currentTeam)
             {
                 currentPlayer.SetInputEnabled(false);
             }
@@ -248,7 +250,7 @@ public class JustOneMoreController : MonoBehaviour {
         }
         if (Input.GetMouseButtonUp(1))
         {
-            foreach (var currentPlayer in currentPlayers)
+            foreach (var currentPlayer in currentTeam)
             {
                 currentPlayer.SetInputEnabled(true);
             }
@@ -262,7 +264,7 @@ public class JustOneMoreController : MonoBehaviour {
             float down = float.MaxValue;
             float up = float.MinValue;
 
-            foreach (var currentPlayer in currentPlayers)
+            foreach (var currentPlayer in currentTeam)
             {
                 float x = currentPlayer.transform.position.x;
                 float z = currentPlayer.transform.position.z;
@@ -274,7 +276,7 @@ public class JustOneMoreController : MonoBehaviour {
 
             Vector3 center = new Vector3(left + ((right - left) / 2), 0, down + ((up - down) / 2));
 
-            foreach (var currentPlayer in currentPlayers)
+            foreach (var currentPlayer in currentTeam)
             {
                 currentPlayer.OverrideDirection(center - currentPlayer.transform.position);
             }

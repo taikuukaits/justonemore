@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 public class TileGroup : MonoBehaviour {
 
@@ -8,31 +9,35 @@ public class TileGroup : MonoBehaviour {
     public bool startsDisabled;
     private bool spawned = false;
 
-    public void Spawn()
+    public void Spawn(Vector3 spawnLocation)
     {
         if (spawned) return;
         spawned = true;
 
-        var tiles = GetComponentsInChildren<Tile>(); 
+        List<TilePlatform> platforms = new List<TilePlatform>(GetComponentsInChildren<TilePlatform>());
+        platforms = platforms.OrderBy(platform => platform.priority).ToList();
 
-        float minX = float.MaxValue;
-        float minZ = float.MaxValue;
-        foreach (var tile in tiles)
-        { 
-            minX = Mathf.Min(minX, tile.transform.position.x);
-            minZ = Mathf.Min(minZ, tile.transform.position.z);
-        }
-
-        foreach (var tile in tiles)
+        float platformDelay = 0f;
+        foreach (var platform in platforms)
         {
-            float x = tile.transform.position.x - minX;
-            float z = tile.transform.position.z - minZ;
-            tile.Spawned(x * 0.1f + z * 0.1f);
-        }
+            var tiles = platform.GetComponentsInChildren<Tile>();
 
-        foreach (var onSpawn in GetComponentsInChildren<IOnTileGroupSpawned>(includeInactive: true))
-        {
-            onSpawn.OnTileGroupSpawned();
+            Vector3 origin = platform.GetTileOrigin(tiles);
+
+            foreach (var tile in tiles)
+            {
+                float x = Mathf.Abs(tile.transform.position.x - origin.x);
+                float z = Mathf.Abs(tile.transform.position.z - origin.z);
+                tile.Spawned(platformDelay + x * 0.1f + z * 0.1f);
+            }
+
+            foreach (var onSpawn in GetComponentsInChildren<IOnTileGroupSpawned>(includeInactive: true))
+            {
+                onSpawn.OnTileGroupSpawned();
+            }
+
+            platformDelay += platform.delay;
+
         }
 
     }

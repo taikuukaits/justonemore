@@ -3,9 +3,16 @@ using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 
+[System.Serializable]
+public class PlayerTypeDefinition {
+    public Player.PlayerType type;
+    public GameObject model;
+}
+
 public class Player : MonoBehaviour {
 
     public GameObject leaderIcon;
+    public GameObject teamIcon;
     public PlayerAnimator animator;
     public Transform followTarget;
     public Transform danceTarget;
@@ -15,30 +22,57 @@ public class Player : MonoBehaviour {
 
     public PlayerInput input;
 
-    public Vector3 velocity;
-    public Vector3 basevelocity;
-    public Vector3 cachevelocity;
+    public bool isLeader = false;
+    public bool isOnTeam = false;
+    public bool hasEverBeenOnTeam = false;
+    bool dancing = false;
+
+    public enum PlayerType {
+        BusinessMan,
+        Doctor,
+        StreetMan,
+        Punk,
+        Woman,
+        Hobo,
+        Trucker
+    }
+
+    [System.NonSerialized]
+    public PlayerSpawn playerSpawnBirthplace;
+
+    public List<PlayerTypeDefinition> playerTypeDefinitions = new List<PlayerTypeDefinition>();
+    public void SetPlayerType(PlayerType type)
+    {
+        foreach (var playerTypeDefinition in playerTypeDefinitions)
+        {
+            if (playerTypeDefinition.type == type)
+            {
+                playerTypeDefinition.model.SetActive(true);
+            }
+            else
+            {
+                playerTypeDefinition.model.SetActive(false);
+            }
+        }
+    }
     
     // Use this for initialization
     void Start () {
-		
-	}
+        RefreshTeamAndLeader();
+
+    }
 
     public void BecomeLeader()
     {
-        leaderIcon.SetActive(true);
+        isLeader = true;
+        RefreshTeamAndLeader();
     }
 
     public void DiscardLeader() {
-        leaderIcon.SetActive(false);
+        isLeader = false;
+        RefreshTeamAndLeader();
     }
 
-    // Update is called once per frame
-    void Update () {
-        velocity = controller.KinematicCharacterMotor.Velocity;	
-        basevelocity = controller.KinematicCharacterMotor.BaseVelocity;	
-        cachevelocity = controller.CacheVelocity;	
-	}
 
     public void Scale()
     {
@@ -55,7 +89,7 @@ public class Player : MonoBehaviour {
     public void Dance()
     {
         animator.Dance();
-
+        dancing = true;
     }
     public void StopDance()
     {
@@ -77,5 +111,42 @@ public class Player : MonoBehaviour {
     public void SetIgnoreColliders(List<Collider> colliders)
     {
         controller.SetIgnoreColliders(colliders);
+    }
+
+    public void JoinTeam()
+    {
+        hasEverBeenOnTeam = true;
+        isOnTeam = true;
+        RefreshTeamAndLeader();
+        
+    }
+
+    public void DisbandTeam()
+    {
+        isOnTeam = false;
+        RefreshTeamAndLeader();
+        
+    }
+
+    public void RefreshTeamAndLeader()
+    {
+        if (!dancing)
+        {
+            if (isOnTeam)
+            {
+                animator.Idle();
+            }
+            else if (hasEverBeenOnTeam)
+            {
+                animator.ImpatientIdle();
+
+            }
+            else
+            {
+                animator.Idle();
+            }
+        }
+        teamIcon.SetActive(isOnTeam && !isLeader);
+        leaderIcon.SetActive(isLeader);
     }
 }
