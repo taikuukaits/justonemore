@@ -34,8 +34,6 @@ public class PlayerInput : MonoBehaviour {
         float moveVertical = Input.GetAxis("Vertical");
 
 
-
-        float interact = Input.GetAxis("Interact");
         bool jump = Input.GetButton("Jump");
 
         playerController.SetJumpPressed(jump);

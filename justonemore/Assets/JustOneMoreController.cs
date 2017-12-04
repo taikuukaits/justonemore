@@ -103,8 +103,23 @@ public class JustOneMoreController : MonoBehaviour {
             currentPlayer.SetIgnoreColliders(playerColliders);
         }
 
+        if (leader != null) leader.DiscardLeader();
         leader = player;
         orbitFollow.SetFollowTarget(leader.followTarget);
+        leader.BecomeLeader();
+    }
+
+    public void ToggleLeader()
+    {
+        if (leader != null) leader.DiscardLeader();
+
+        int leaderPos = currentPlayers.IndexOf(leader);
+        leaderPos++;
+        if (leaderPos >= currentPlayers.Count) leaderPos = 0;
+        
+        leader = currentPlayers[leaderPos];
+        orbitFollow.SetFollowTarget(leader.followTarget);
+        leader.BecomeLeader();
     }
 
     Player InstantiatePlayer(Vector3 position)
@@ -130,6 +145,7 @@ public class JustOneMoreController : MonoBehaviour {
         Player player = InstantiatePlayer(position);
         player.SetInputEnabled(false);
         player.Scale();
+        player.DiscardLeader();
 
         var becomePlayerOnContact = player.gameObject.AddComponent<BecomePlayerOnContact>();
         becomePlayerOnContact.playerToActivate = player;
@@ -146,8 +162,31 @@ public class JustOneMoreController : MonoBehaviour {
         //}
     }
 
+    public void Disband()
+    {
+        foreach (Player player in currentPlayers)
+        {
+            if (leader != player)
+            {
+                player.SetInputEnabled(false);
+                var becomePlayerOnContact = player.gameObject.AddComponent<BecomePlayerOnContact>();
+                becomePlayerOnContact.playerToActivate = player;
+                becomePlayerOnContact.controller = this;
+            }
+        }
+    }
+
     // Update is called once per frame
     void Update () {
+        if (Input.GetButtonDown("SwitchLeader"))
+        {
+            ToggleLeader();
+        }
+        if (Input.GetButtonDown("Disband"))
+        {
+            Disband();
+        }
+
         List<Player> newlyDeadPlayers = new List<Player>();
         foreach (var currentPlayer in currentPlayers)
         {
@@ -192,7 +231,9 @@ public class JustOneMoreController : MonoBehaviour {
         {
             if (!currentPlayers.Contains(leader))
             {
+                if (leader != null) leader.DiscardLeader();
                 leader = currentPlayers.First();
+                leader.BecomeLeader();
                 orbitFollow.SetFollowTarget(leader.followTarget);
             }
         }

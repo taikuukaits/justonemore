@@ -24,8 +24,5 @@ public class TileGroupSpawner : PlayerTriggerable {
 		
 	}
 	
-	// Update is called once per frame
-	void Update () {
-        this.transform.Rotate(Vector3.up * Time.deltaTime * 320f, Space.World);
-	}
+	
 }

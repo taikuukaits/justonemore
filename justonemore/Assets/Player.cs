@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class Player : MonoBehaviour {
 
+    public GameObject leaderIcon;
     public PlayerAnimator animator;
     public Transform followTarget;
     public Transform danceTarget;
@@ -17,14 +18,23 @@ public class Player : MonoBehaviour {
     public Vector3 velocity;
     public Vector3 basevelocity;
     public Vector3 cachevelocity;
-
+    
     // Use this for initialization
     void Start () {
 		
 	}
-	
-	// Update is called once per frame
-	void Update () {
+
+    public void BecomeLeader()
+    {
+        leaderIcon.SetActive(true);
+    }
+
+    public void DiscardLeader() {
+        leaderIcon.SetActive(false);
+    }
+
+    // Update is called once per frame
+    void Update () {
         velocity = controller.KinematicCharacterMotor.Velocity;	
         basevelocity = controller.KinematicCharacterMotor.BaseVelocity;	
         cachevelocity = controller.CacheVelocity;	
