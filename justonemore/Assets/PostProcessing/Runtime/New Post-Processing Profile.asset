@@ -72,7 +72,7 @@ MonoBehaviour:
     m_Enabled: 1
     m_Settings:
       focusDistance: 10
-      aperture: 1
+      aperture: 1.8
       focalLength: 37
       useCameraFov: 0
       kernelSize: 1
@@ -121,10 +121,10 @@ MonoBehaviour:
         neutralWhiteClip: 10
       basic:
         postExposure: 0
-        temperature: 20
+        temperature: 7.4
         tint: 0
-        hueShift: -13
-        saturation: 1.22
+        hueShift: -6
+        saturation: 1.149
         contrast: 1.01
       channelMixer:
         red: {x: 1, y: 0, z: 0}

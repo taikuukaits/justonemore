@@ -17,7 +17,7 @@ public class OrbitInput : MonoBehaviour {
         float lookHorizontal = Input.GetAxis("Mouse X");
         float lookVertical = Input.GetAxis("Mouse Y");
 
-        float orbitDamp = 0.5f;
+        float orbitDamp = 0.1f;
         orbitFollow.SetInputs(1, new Vector2(lookHorizontal * orbitDamp, lookVertical * orbitDamp));
         
     }

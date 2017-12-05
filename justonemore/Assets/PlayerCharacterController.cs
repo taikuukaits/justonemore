@@ -90,11 +90,11 @@ public class PlayerCharacterController : BaseCharacterController
         if (KinematicCharacterMotor.IsStableOnGround)
         {
             // Reorient velocity on slope
-            currentVelocity = KinematicCharacterMotor.GetDirectionTangentToSurface(currentVelocity, KinematicCharacterMotor.GroundNormal) * currentVelocity.magnitude;
+            //currentVelocity = KinematicCharacterMotor.GetDirectionTangentToSurface(currentVelocity, KinematicCharacterMotor.GroundNormal) * currentVelocity.magnitude;
 
             // Calculate target velocity
             Vector3 inputRight = Vector3.Cross(desiredDirection, KinematicCharacterMotor.CharacterUp);
-            Vector3 reorientedInput = Vector3.Cross(KinematicCharacterMotor.GroundNormal, inputRight).normalized * desiredDirection.magnitude;
+            Vector3 reorientedInput = Vector3.Cross(KinematicCharacterMotor.CharacterUp, inputRight).normalized * desiredDirection.magnitude;
             targetMovementVelocity = reorientedInput * MaxStableMoveSpeed;
 
                 currentVelocity = targetMovementVelocity;
